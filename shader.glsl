@@ -12,7 +12,14 @@ float db(vec3 testp, vec3 c){
     ));
 }*/
 
-vec4 dwm(vec3 testp, vec3 cbm){
+struct CastResult
+{
+    float dist;
+    float refl;
+    vec3 color;
+};
+
+CastResult dwm(vec3 testp, vec3 cbm){
     float ma = 200.0;
     
     float sh1 = distance(testp,vec3(-0.8,0.0,-0.5))-0.5;
@@ -28,19 +35,27 @@ vec4 dwm(vec3 testp, vec3 cbm){
     float mi = min(ma,min(sh4,min(sh3,min(sh2,min(sh1,sh5)))));
     
     vec3 c = vec3(texture(iChannel0, cbm).xyz);
+    
+    float reflection = 0.0;
     if (mi==sh1 || mi==sh2){
         c = vec3(1.0,0.0,0.0);
         //c = vec3(0.0,1.0,floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0));
     }else if (mi==sh3 || mi==sh4 || mi==sh5){
-        float bro = floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0);
-        c = vec3(bro);
+        //float bro = floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0);
+        reflection = 1.0;
+        c = vec3(1.0);
     }
     
-    return vec4(mi,c);
+    CastResult cr;
+    cr.dist = mi;
+    cr.refl = reflection;
+    cr.color = c;
+    
+    return cr;
 }
 
 float d(vec3 testp){
-    return dwm(testp, vec3(0.0)).x;
+    return dwm(testp, vec3(0.0)).dist;
 }
 
 vec3 calcNormal( in vec3 p ) // for function d(p)
@@ -73,10 +88,30 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     float cdis = 100.0;
     int maxstep = 100;
-    
-    bool hit = false;
+    float nextInflucence = 1.0;
     
     while (maxstep>0 && cdis>0.1){
+        maxstep-=1;
+        CastResult cr = dwm(pos,uv.x*dir);
+        cdis = cr.dist;
+        pos = pos+dir*cdis*0.9;
+        
+        if (cdis<.05){
+            col = m[2]*nextInfluence+col*(1.0-nextInfluence);
+            nextInfluence = nextInfluence*m[1];
+            if (m[1]<0.05){
+                cdis=0.0;
+            }else{
+                cdis = 0.11;
+                vec3 normal = calcNormal(pos);
+                dir = reflect(dir,normal);
+                pos = pos+dir*cdis*0.93;
+                
+            }
+        }
+    }
+    
+    /*while (maxstep>0 && cdis>0.1){
         maxstep-=1;
         cdis = dwm(pos,uv.x*dir).x;
         pos = pos+dir*cdis;
@@ -127,7 +162,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             }
             col = (col*0.3+lcol*0.7);
         }
-    }
+    }*/
+    
     
 
     // Time varying pixel color
