@@ -7,39 +7,58 @@ struct CastResult
 {
     float dist;
     float refl;
+    float tran;
     vec3 color;
 };
 
 CastResult dwm(vec3 testp, vec3 cbm){
     float ma = 200.0;
+    CastResult cr;
     
-    float sh1 = distance(testp,vec3(-0.8,0.0,-0.5))-0.5;
+    float sh1 = distance(testp,vec3(-1.6,0.0,-0.5))-0.5;
     
-    float sh2 = distance(testp,vec3( 0.8,0.0,-0.5))-0.5;
+    float sh2 = distance(testp,vec3( 1.6,0.0,-0.5))-0.5;
     
     float sh3 = db(testp+vec3(0.0,1.0,0.0),vec3(0.5,0.2,1));
     
-    float sh4 = (1.0+testp.y)*1.5;
+    float sh4 = (testp.y+1.0)
+    +max((sin(testp.x*16.3)*cos(testp.z*16.3))*0.03,-.01)
+    +(sin(testp.x*0.3)*cos(testp.z*0.3))*0.8;
+    //(1.0+testp.y)*1.5;
     
     float sh5 = distance(testp,vec3(0.0 ,0.2,1.0))-0.5;
+    vec3 sqp = vec3(2.0,0.0,-4.0);
+    vec3 offs = testp-sqp; 
     
-    float mi = min(ma,min(sh4,min(sh3,min(sh2,min(sh1,sh5)))));
+    float da = 6.0;
+    
+    float walla = ((abs(mod(offs.x,da)-da*0.5)*.1)+(abs(mod(offs.z+2.0,da)-da*0.5)*0.1)+(abs(offs.y-2.0)*0.1))-0.05;
+    
+    float mi = min(min(ma,min(sh4,min(sh3,min(sh2,min(sh1,sh5))))),walla);
     
     vec3 c = vec3(texture(iChannel0, cbm).xyz);
     
-    float reflection = 0.0;
     if (mi==sh1 || mi==sh2){
         c = vec3(1.0,0.0,0.0);
         //c = vec3(0.0,1.0,floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0));
-    }else if (mi==sh3 || mi==sh4 || mi==sh5){
+    }else if (mi==sh3 || mi==sh5){
         float bro = clamp(floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0)+.5,.0,1.);
-        reflection = 0.06;
-        c = vec3(bro,0.0,0.0);
+        cr.refl = 0.96;
+        c = vec3(1.0,1.0,1.0);
+    }else if (mi==sh4){
+        c = vec3(0.4,0.7,0.1);
+    }else if (mi==walla){
+        c = vec3(0.1,0.65,1.0);
+        cr.refl = 0.3;
     }
     
-    CastResult cr;
+    if (mi==sh2) {
+        cr.tran = 1.0;
+        cr.refl = 0.0;
+    }
+    
+    
     cr.dist = mi;
-    cr.refl = reflection;
     cr.color = c;
     
     return cr;
@@ -56,6 +75,7 @@ vec3 calcNormal( in vec3 p ) // for function d(p)
     return normalize( vec3(d(p+h.xyy) - d(p-h.xyy),
                            d(p+h.yxy) - d(p-h.yxy),
                            d(p+h.yyx) - d(p-h.yyx) ) );
+    //return normalize( vec3(d(p+h.xyy) - d(p), d(p+h.yxy) - d(p), d(p+h.yyx) - d(p)));
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
@@ -67,8 +87,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec3 lightfrom = normalize(vec3(0.0,1.0,-0.2));
     
-    float yaw = (iMouse.x/iResolution.x-0.5)*3.5;
-    float pitch = clamp(-(iMouse.y/iResolution.y)*1.0+0.02,-.92,0.0);
+    float yaw = (iMouse.x/iResolution.x-0.5)*7.2;
+    float pitch = clamp(-(iMouse.y/iResolution.y)*2.1+0.02,-1.22,0.1);
     
     //vec3 pos = vec3((uv.x-0.5)*0.2,(uv.y-0.5)*0.2,-12.0+cos(iTime)*5.0);
     //vec3 pos = vec3(-sin(iTime*0.2)*12.0,0.0,cos(iTime*0.2)*12.0);
@@ -111,30 +131,37 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 cubemap = vec3(texture(iChannel0, uv.x*dir).xyz);    
     col = cubemap;
     
-    float cdis = 100.0;
-    int maxstep = 400;
+    float cdis = 400.0;
+    int maxstep = 600;
     vec3 mul = vec3(1.0);
     float nextInfluence = 1.0;
     
     
     bool hit = false;
     vec3 fhpos = vec3(1.0/0.0);
+    bool escape = false;
     
     while (maxstep>0 && cdis>0.06){
         maxstep-=1;
         CastResult cr = dwm(pos,uv.x*dir);
         cdis = cr.dist;
-        pos = pos+dir*cdis*0.45;
+        pos = pos+dir*cdis*0.25;//.45
         
         //dir+=vec3(0.0,-cdis*0.005,0.0);
         //dir = normalize(dir);
+        if (cdis>=.1 && escape){
+            escape=false;
+            col = vec3(1.0);
+            pos = pos+dir;
+        }
         
-        if (cdis<.09){
+        if (cdis<.09 && !escape){
             vec3 normal = calcNormal(pos);
             
             if (!hit) {
                 hit=true;
                 fhpos = pos;
+                if (cr.tran<=0.01) col = cr.color;
             }
             
             float light = 0.5+abs(dot(lightfrom,normal)+0.6)*0.4;
@@ -143,15 +170,26 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             
             col = col*light;
             
-            nextInfluence = nextInfluence*cr.refl;
-            mul*= cr.color;
+            if (cr.tran>0.01){
+                escape = true;
+                nextInfluence = nextInfluence*cr.tran;
+                mul*= cr.color;
+                col = col.xxx;
+                
+                cdis = 0.191;
+                //dir = refract(dir,normal,1.45);
+                pos = pos+dir*cdis;
+            }
             
             if (cr.refl<0.05){
-                cdis=0.0;
+                cdis = 0.0;
             }else{
+                nextInfluence = nextInfluence*cr.refl;
+                mul*= cr.color;
                 cdis = 0.091;
                 dir = reflect(dir,normal);
                 pos = pos+dir*cdis*0.93;
+                //maxstep-=30;
                 
             }
         }else{
@@ -162,9 +200,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec3 dif = fhpos-spos;
     float pdis = dot(dif,dif);
-    float fog = clamp(1.0-clamp(pdis*3.0-600.0,0.0,1000.0)*0.0005,0.0,1.0);
+    //float fog = clamp(1.0-clamp(pdis*2.0-900.0,0.0,1000.0)*0.0005,0.0,1.0); // humid half fog
+    float fog = clamp(1.0-clamp(pdis*1.0-300.0,0.0,1000.0)*0.001,0.0,1.0); // serious full fog
     //col = vec3(fog);
-    col = col*(fog)+vec3(1.0-fog)*cubemap;
+    col = col*(fog)+vec3(1.0-fog)*vec3(1.0);
+    //col = vec3(nextInfluence*16.0);
     //col = vec3(fragCoord.y/255.0,fragCoord.x/255.0,0.5);
     
     // Output to screen
