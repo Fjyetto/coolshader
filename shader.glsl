@@ -32,16 +32,19 @@ CastResult dwm(vec3 testp, vec3 cbm){
     
     float da = 6.0;
     
-    float walla = ((abs(mod(offs.x,da)-da*0.5)*.1)+(abs(mod(offs.z+2.0,da)-da*0.5)*0.1)+(abs(offs.y-2.0)*0.1))-0.05;
+    float wallx = abs(testp.x-6.0);
+    float wallx2 = abs(testp.x+18.0);
     
-    float mi = min(min(ma,min(sh4,min(sh3,min(sh2,min(sh1,sh5))))),walla);
+    float walla = 600.0;//((abs(mod(offs.x,da)-da*0.5)*.1)+(abs(mod(offs.z+2.0,da)-da*0.5)*0.1)+(abs(offs.y-2.0)*0.1))-0.05;
+    
+    float mi = min(min(ma,min(sh4,min(sh3,min(sh2,min(sh1,sh5))))),min(wallx,wallx2));
     
     vec3 c = vec3(texture(iChannel0, cbm).xyz);
     
     if (mi==sh1 || mi==sh2){
         c = vec3(1.0,0.0,0.0);
         //c = vec3(0.0,1.0,floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0));
-    }else if (mi==sh3 || mi==sh5){
+    }else if (mi==sh3 || mi==sh5 || mi==wallx || mi==wallx2){
         float bro = clamp(floor(mod(floor(testp.z)*0.5+testp.y+testp.x*0.5,1.0)*2.0)+.5,.0,1.);
         cr.refl = 0.96;
         c = vec3(1.0,1.0,1.0);
@@ -95,6 +98,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     //vec3 pos = vec3(-sin(yaw)*12.0,0.0,cos(yaw)*12.0);
     //vec3 dir = vec3((uv.x-0.5)*0.5,(uv.y-0.5)*0.3,1.0);
     vec3 udir = vec3((uv.x-0.5),(uv.y-0.5)*.6,1.0);
+    //vec3 udir = vec3(cos((uv.x-0.25)*3.14159*2.0),(uv.y-0.5)*1.6,sin((uv.x-0.25)*3.14159*2.0));
+    
     
     udir = vec3( //apply pitch
     udir.x,
@@ -131,8 +136,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 cubemap = vec3(texture(iChannel0, uv.x*dir).xyz);    
     col = cubemap;
     
-    float cdis = 400.0;
-    int maxstep = 600;
+    float cdis = 800.0;
+    int maxstep = 700;
     vec3 mul = vec3(1.0);
     float nextInfluence = 1.0;
     
